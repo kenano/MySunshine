@@ -141,16 +141,50 @@ public class WeatherContract {
         }
 
         /**
+         *Builds a uri that contains the location setting and date.
          *
-         * @param locationSetting
-         * @param date
-         * @return
+         * @param locationSetting - represents the location we are searching.
+         * @param date date to be put in uri
+         * @return a uri with the passed date in it.
          */
         public static Uri buildWeatherLocationWithDate(String locationSetting, long date) {
             return CONTENT_URI.buildUpon().appendPath(locationSetting)
                     .appendPath(Long.toString(normalizeDate(date))).build();
         }
 
+        /**
+         * parses the a uri for the date segment which is a number.
+         *
+         * @param uri to be parsed.
+         * @return number which represents the date passed in the uri.
+         */
+        public static long getDateFromUri(Uri uri) {
+            return Long.parseLong(uri.getPathSegments().get(2));
+        }
+
+        /**
+         *  parses the a uri for the location setting.
+         *
+         * @param uri to be parsed.
+         * @return string representing the location setting.
+         */
+        public static String getLocationSettingFromUri(Uri uri) {
+            return uri.getPathSegments().get(1);
+        }
+
+        /**
+         * parses uri for a "date" column. If it exists the date is returned as a long.
+         *
+         * @param uri to be parsed.
+         * @return number representing the date or 0 if doesnt exist i uri.
+         */
+        public static long getStartDateFromUri(Uri uri) {
+            String dateString = uri.getQueryParameter(COLUMN_DATE);
+            if (null != dateString && dateString.length() > 0)
+                return Long.parseLong(dateString);
+            else
+                return 0;
+        }
     }
 
 }
