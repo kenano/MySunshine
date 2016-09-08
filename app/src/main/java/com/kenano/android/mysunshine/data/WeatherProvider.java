@@ -51,13 +51,37 @@ public class WeatherProvider extends ContentProvider {
                         String[] selectionArgs,
                         String sortOrder) {
 
+
         return null;
     }
 
+    /**
+     *Since there can be different types of request on the content provider this method matches
+     * the uri to determine the request type.
+     *
+     * @param uri - to be matched to determine the type of request.
+     * @return A string which is defined in the contract that ids the type of request
+     */
     @Nullable
     @Override
     public String getType(Uri uri) {
-        return null;
+
+        // Use the Uri Matcher to determine what kind of URI this is.
+        final int match = sUriMatcher.match(uri);
+
+        switch (match) {
+            // Student: Uncomment and fill out these two cases
+            case WEATHER_WITH_LOCATION_AND_DATE:
+                return WeatherContract.WeatherEntry.CONTENT_ITEM_TYPE;
+            case WEATHER_WITH_LOCATION:
+                return WeatherContract.WeatherEntry.CONTENT_TYPE;
+            case WEATHER:
+                return WeatherContract.WeatherEntry.CONTENT_TYPE;
+            case LOCATION:
+                return WeatherContract.LocationEntry.CONTENT_TYPE;
+            default:
+                throw new UnsupportedOperationException("Unknown uri: " + uri);
+        }
     }
 
     @Nullable
