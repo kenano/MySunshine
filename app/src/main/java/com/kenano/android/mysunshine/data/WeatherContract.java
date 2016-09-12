@@ -1,6 +1,7 @@
 package com.kenano.android.mysunshine.data;
 
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.net.Uri;
 import android.provider.BaseColumns;
 import android.text.format.Time;
@@ -32,8 +33,13 @@ public class WeatherContract {
     public static final String PATH_LOCATION = "location";
 
 
-    // To make it easy to query for the exact date, we normalize all dates that go into
-    // the database to the start of the the Julian day at UTC.
+    /**
+     * To make it easy to query for the exact date, we normalize all dates that go into
+     * the database to the start of the the Julian day at UTC.
+     *
+     * @param startDate
+     * @return
+     */
     public static long normalizeDate(long startDate) {
         // normalize the start date to the beginning of the (UTC) day
         Time time = new Time();
@@ -79,9 +85,19 @@ public class WeatherContract {
         // map intent, we store the latitude and longitude as returned by openweathermap.
         public static final String COLUMN_COORD_LAT = "coord_lat";
         public static final String COLUMN_COORD_LONG = "coord_long";
+
+        /**
+         *
+         * @param id
+         * @return
+         */
+        public static Uri buildLocationUri(long id) {
+            return ContentUris.withAppendedId(CONTENT_URI, id);
+        }
     }
 
-    /** Inner class that defines the contents of the weather table
+    /**
+     * Inner class that defines the contents of the weather table
      *  Since it implements BaseColumns it will already have _id property for the primary key.
      */
     public static final class WeatherEntry implements BaseColumns {
@@ -153,6 +169,19 @@ public class WeatherContract {
         }
 
         /**
+         *
+         * @param locationSetting
+         * @param startDate
+         * @return
+         */
+        public static Uri buildWeatherLocationWithStartDate(
+                String locationSetting, long startDate) {
+            long normalizedDate = normalizeDate(startDate);
+            return CONTENT_URI.buildUpon().appendPath(locationSetting)
+                    .appendQueryParameter(COLUMN_DATE, Long.toString(normalizedDate)).build();
+        }
+
+        /**
          * parses the a uri for the date segment which is a number.
          *
          * @param uri to be parsed.
@@ -185,6 +214,14 @@ public class WeatherContract {
             else
                 return 0;
         }
-    }
 
+        /**
+         *
+         * @param id
+         * @return
+         */
+        public static Uri buildWeatherUri(long id) {
+            return ContentUris.withAppendedId(CONTENT_URI, id);
+        }
+    }
 }

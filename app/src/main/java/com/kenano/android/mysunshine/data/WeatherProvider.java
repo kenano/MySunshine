@@ -4,6 +4,7 @@ import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.UriMatcher;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.support.annotation.Nullable;
@@ -42,10 +43,11 @@ public class WeatherProvider extends ContentProvider {
     private static final SQLiteQueryBuilder sWeatherByLocationSettingQueryBuilder;
 
     static{
+
+        //create sql query.
         sWeatherByLocationSettingQueryBuilder = new SQLiteQueryBuilder();
 
-        //This is an inner join which looks like
-        //weather INNER JOIN location ON weather.location_id = location._id
+        //build a inner join query
         sWeatherByLocationSettingQueryBuilder.setTables(
                 WeatherContract.WeatherEntry.TABLE_NAME + " INNER JOIN " +
                         WeatherContract.LocationEntry.TABLE_NAME +
@@ -55,6 +57,9 @@ public class WeatherProvider extends ContentProvider {
                         "." + WeatherContract.LocationEntry._ID);
     }
 
+
+    //for selection components of query use question-mark placement syntax.
+    //the "?" symbols will be replaced with values placed into selectionArgs in the query method
     //location.location_setting = ?
     private static final String sLocationSettingSelection =
             WeatherContract.LocationEntry.TABLE_NAME +
@@ -62,7 +67,7 @@ public class WeatherProvider extends ContentProvider {
 
     //location.location_setting = ? AND date >= ?
     private static final String sLocationSettingWithStartDateSelection =
-            WeatherContract.LocationEntry.TABLE_NAME+
+            WeatherContract.LocationEntry.TABLE_NAME +
                     "." + WeatherContract.LocationEntry.COLUMN_LOCATION_SETTING + " = ? AND " +
                     WeatherContract.WeatherEntry.COLUMN_DATE + " >= ? ";
 
@@ -107,11 +112,13 @@ public class WeatherProvider extends ContentProvider {
             // "weather/*/*"
             case WEATHER_WITH_LOCATION_AND_DATE:
             {
+                //build the query and execute it.
                 retCursor = getWeatherByLocationSettingAndDate(uri, projection, sortOrder);
                 break;
             }
             // "weather/*"
             case WEATHER_WITH_LOCATION: {
+                //build the query and execute it.
                 retCursor = getWeatherByLocationSetting(uri, projection, sortOrder);
                 break;
             }
@@ -182,28 +189,162 @@ public class WeatherProvider extends ContentProvider {
         }
     }
 
+    /**
+     * inserts data into content provider.
+     *
+     * @param uri used to specify request
+     * @param values the values to be inserted into content provider.
+     * @return a uri representing the data entered.
+     */
     @Nullable
     @Override
     public Uri insert(Uri uri,
                       ContentValues values) {
-        return null;
-    }
 
-    @Override
-    public int delete(Uri uri, String selection,
-                      String[] selectionArgs) {
-        return 0;
-    }
+        //get an instance of the db being used.
+        final SQLiteDatabase db = mOpenHelper.getWritableDatabase();
 
-    @Override
-    public int update(Uri uri, ContentValues values,
-                      String selection,
-                      String[] selectionArgs) {
-        return 0;
+        //determine type of request using uri matcher.
+        final int match = sUriMatcher.match(uri);
+        Uri returnUri;
+
+        //select which table go enter data based on uri.
+        switch (match) {
+            case WEATHER: {
+
+                //changes date to what db uses.
+                normalizeDate(values);
+
+                //insert weather entry, build a uri that represents entry. return it or throw
+                //exception
+                long _id = db.insert(WeatherContract.WeatherEntry.TABLE_NAME, null, values);
+                if ( _id > 0 )
+                    returnUri = WeatherContract.WeatherEntry.buildWeatherUri(_id);
+                else
+                    throw new android.database.SQLException("Failed to insert row into " + uri);
+                break;
+            }
+            case LOCATION: {
+
+                //insert location entry, build a uri that represents entry. return it or throw
+                //exception
+                long _id = db.insert(WeatherContract.LocationEntry.TABLE_NAME, null, values);
+                if ( _id > 0 )
+                    returnUri = WeatherContract.LocationEntry.buildLocationUri(_id);
+                else
+                    throw new android.database.SQLException("Failed to insert row into " + uri);
+                break;
+            }
+            default:
+                throw new UnsupportedOperationException("Unknown uri: " + uri);
+        }
+
+        //send notification th contnent provider has changed.
+        getContext().getContentResolver().notifyChange(uri, null);
+
+        return returnUri;
     }
 
     /**
+     * deletes data from content provider
      *
+     * @param uri specifies request type
+     * @param selection used to filter request
+     * @param selectionArgs args used for filtering
+     * @return number of rows deleted
+     */
+    @Override
+    public int delete(Uri uri,
+                      String selection,
+                      String[] selectionArgs) {
+
+        //get and instance of the db.
+        final SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+
+        //determine type of request using uri matcher.
+        final int match = sUriMatcher.match(uri);
+
+        //number of rows deleted
+        int rowsDeleted;
+
+        // this makes delete all rows return the number of rows deleted
+        if ( null == selection )
+            selection = "1";
+
+        switch (match) {
+            case WEATHER:
+
+                //remove data or throw exception.
+                rowsDeleted = db.delete(
+                        WeatherContract.WeatherEntry.TABLE_NAME, selection, selectionArgs);
+                break;
+            case LOCATION:
+
+                //remove data or throw exception.
+                rowsDeleted = db.delete(
+                        WeatherContract.LocationEntry.TABLE_NAME, selection, selectionArgs);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown uri: " + uri);
+        }
+
+        // Because a null deletes all rows
+        if (rowsDeleted != 0) {
+            getContext().getContentResolver().notifyChange(uri, null);
+        }
+        return rowsDeleted;
+    }
+
+    /**
+     * Update data in content provider
+     *
+     * @param uri specifies request type
+     * @param values the values to be inserted into content provider.
+     * @param selection  used to filter request
+     * @param selectionArgs  args used for filtering
+     * @return
+     */
+    @Override
+    public int update(Uri uri,
+                      ContentValues values,
+                      String selection,
+                      String[] selectionArgs) {
+
+        //get and instance of the db.
+        final SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+
+        //determine type of request using uri matcher.
+        final int match = sUriMatcher.match(uri);
+
+        //number of rows removed
+        int rowsUpdated;
+
+        switch (match) {
+            case WEATHER:
+
+                //changes date to what db uses.
+                normalizeDate(values);
+
+                //update or throw exception
+                rowsUpdated = db.update(WeatherContract.WeatherEntry.TABLE_NAME, values, selection,
+                        selectionArgs);
+                break;
+            case LOCATION:
+
+                //update or throw exception
+                rowsUpdated = db.update(WeatherContract.LocationEntry.TABLE_NAME, values, selection,
+                        selectionArgs);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown uri: " + uri);
+        }
+        if (rowsUpdated != 0) {
+            getContext().getContentResolver().notifyChange(uri, null);
+        }
+        return rowsUpdated;
+    }
+
+    /**
      * Executes a query for requesting weather for a specified location.
      * Extracts query parameters from the uri.
      *
@@ -259,5 +400,18 @@ public class WeatherProvider extends ContentProvider {
                 null,
                 sortOrder
         );
+    }
+
+    /**
+     * Extracts date from contentvalues obj and normalizes date to db date class used
+     * ( Julian day at UTC.)
+     * @param values obj which the date is inside.
+     */
+    private void normalizeDate(ContentValues values) {
+        // normalize the date value
+        if (values.containsKey(WeatherContract.WeatherEntry.COLUMN_DATE)) {
+            long dateValue = values.getAsLong(WeatherContract.WeatherEntry.COLUMN_DATE);
+            values.put(WeatherContract.WeatherEntry.COLUMN_DATE, WeatherContract.normalizeDate(dateValue));
+        }
     }
 }
